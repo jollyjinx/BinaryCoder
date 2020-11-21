@@ -44,6 +44,11 @@ public extension BinaryEncoder {
         
         /// Attempted to encode a type which is not `Encodable`.
         case typeNotConformingToEncodable(Any.Type)
+        
+        /// Attempted to encode a `UInt32` which can't be represented. Because the
+        /// lenght can't be represented with `UInt32`
+        case lenghtOutOfRange(UInt64)
+
     }
 }
 
