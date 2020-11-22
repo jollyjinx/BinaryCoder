@@ -66,7 +66,7 @@ public extension BinaryEncoder {
         appendBytes(of: (value))
     }
     
-    func encode<S: SIMD>(_ value: S) {
+    func encodeSIMD<S: SIMD>(_ value: S) {
         appendBytes(of: (value))
     }
     
@@ -86,13 +86,13 @@ public extension BinaryEncoder {
             try encode(v)
             
         case let simd as SIMD4<UInt8>:
-            return try encode(simd)
+            encodeSIMD(simd) // explicit SIMD beacuse compiler don't do right function overloading.
             
         case let simd as SIMD8<UInt8>:
-            return try encode(simd)
+            encodeSIMD(simd)
             
         case let simd as SIMD16<UInt8>:
-            return try encode(simd)
+            encodeSIMD(simd)
             
         case let binary as BinaryEncodable:
             try binary.binaryEncode(to: self)

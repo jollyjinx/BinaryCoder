@@ -58,6 +58,7 @@ class BinaryCoderTests: XCTestCase {
     func testComplex() {
         struct Company: BinaryCodable {
             var name: String
+            var rawBytes: SIMD4<UInt8>
             var employees: [Employee]
         }
         
@@ -67,7 +68,8 @@ class BinaryCoderTests: XCTestCase {
             var age: Int
         }
         
-        let company = Company(name: "Joe's Discount Airbags", employees: [
+        let company = Company(name: "Joe's Discount Airbags",
+                              rawBytes: SIMD4(arrayLiteral: 2, 0, 240, 1), employees: [
             Employee(name: "Joe Johnson", jobTitle: "CEO", age: 27),
             Employee(name: "Stan Lee", jobTitle: "Janitor", age: 87),
             Employee(name: "Dracula", jobTitle: "Dracula", age: 41),
