@@ -67,6 +67,12 @@ extension String: BinaryCodable {
     }
 }
 
+/*
+extension SIMD where Self.MaskStorage.Scalar: BinaryDecodable {
+    
+}
+ */
+
 extension FixedWidthInteger where Self: BinaryEncodable {
     public func binaryEncode(to encoder: BinaryEncoder) {
         encoder.appendBytes(of: self.littleEndian)

@@ -90,6 +90,12 @@ public extension BinaryDecoder {
         return (swapped)
     }
     
+    func decode<S: SIMD>(_ type: S.Type) throws -> S {
+        var swapped = S()
+        try read(into: &swapped)
+        return (swapped)
+    }
+    
     func decode<T: BinaryDecodable & Sequence>(_ type: T.Type, lenght: UInt32) throws -> T {
         switch type {
         case is String.Type:
@@ -125,6 +131,15 @@ public extension BinaryDecoder {
             
         case is Bool.Type:
             return try decode(Bool.self) as! T
+            
+        case let simd as SIMD4<UInt8>.Type:
+            return try decode(simd) as! T
+            
+        case let simd as SIMD8<UInt8>.Type:
+            return try decode(simd) as! T
+            
+        case let simd as SIMD16<UInt8>.Type:
+            return try decode(simd) as! T
             
         case let binaryT as BinaryDecodable.Type:
             return try binaryT.init(fromBinary: self) as! T
