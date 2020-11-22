@@ -15,6 +15,16 @@ extension Array: BinaryEncodable where Element: BinaryEncodable {
             try (element).encode(to: encoder)
         }
     }
+    
+    public func binaryEncode(to encoder: BinaryEncoder) throws {
+        guard let count32 = UInt32(exactly: self.count) else {
+            throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
+        }
+        try encoder.encode(count32)
+        for element in self {
+            try (element).encode(to: encoder)
+        }
+    }
 }
 
 extension Array: BinaryDecodable where Element: BinaryDecodable {
@@ -45,6 +55,10 @@ extension Array: BinaryDecodable where Element: BinaryDecodable {
 
 extension String: BinaryCodable {
     public func binaryEncode(to encoder: BinaryEncoder, prefixLenght: Bool = true) throws {
+        try Array(self.utf8).binaryEncode(to: encoder, prefixLenght: prefixLenght)
+    }
+    
+    public func binaryEncode(to encoder: BinaryEncoder) throws {
         try Array(self.utf8).binaryEncode(to: encoder)
     }
     

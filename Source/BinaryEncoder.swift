@@ -66,6 +66,10 @@ public extension BinaryEncoder {
         appendBytes(of: (value))
     }
     
+    func encode<S: SIMD>(_ value: S) {
+        appendBytes(of: (value))
+    }
+    
     func encode(_ encodable: Encodable) throws {
         switch encodable {
         case let v as Int:
@@ -80,6 +84,15 @@ public extension BinaryEncoder {
             
         case let v as Bool:
             try encode(v)
+            
+        case let simd as SIMD4<UInt8>:
+            return try encode(simd)
+            
+        case let simd as SIMD8<UInt8>:
+            return try encode(simd)
+            
+        case let simd as SIMD16<UInt8>:
+            return try encode(simd)
             
         case let binary as BinaryEncodable:
             try binary.binaryEncode(to: self)
