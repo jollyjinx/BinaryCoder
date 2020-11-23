@@ -4,23 +4,25 @@ import Foundation
 
 
 extension Array: BinaryEncodable where Element: BinaryEncodable {
-    public func binaryEncode(to encoder: BinaryEncoder, prefixLenght: Bool = true) throws {
+    public func binaryEncode(to encoder: Encoder, prefixLenght: Bool = true) throws {
+        var container = encoder.unkeyedContainer()
         if prefixLenght {
             guard let count32 = UInt32(exactly: self.count) else {
                 throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
             }
-            try encoder.encode(count32)
+            try container.encode(count32)
         }
         for element in self {
-            try (element).encode(to: encoder)
+            try container.encode(element)
         }
     }
     
-    public func binaryEncode(to encoder: BinaryEncoder) throws {
+    public func binaryEncode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
         guard let count32 = UInt32(exactly: self.count) else {
             throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
         }
-        try encoder.encode(count32)
+        try container.encode(count32)
         for element in self {
             try (element).encode(to: encoder)
         }
@@ -54,11 +56,11 @@ extension Array: BinaryDecodable where Element: BinaryDecodable {
 }
 
 extension String: BinaryCodable {
-    public func binaryEncode(to encoder: BinaryEncoder, prefixLenght: Bool = true) throws {
+    public func binaryEncode(to encoder: Encoder, prefixLenght: Bool = true) throws {
         try Array(self.utf8).binaryEncode(to: encoder, prefixLenght: prefixLenght)
     }
     
-    public func binaryEncode(to encoder: BinaryEncoder) throws {
+    public func binaryEncode(to encoder: Encoder) throws {
         try Array(self.utf8).binaryEncode(to: encoder)
     }
     
@@ -81,17 +83,37 @@ extension String: BinaryCodable {
     }
 }
 
-/*
-extension SIMD where Self.MaskStorage.Scalar: BinaryDecodable {
-    
-}
- */
 
+extension SIMD where Self: BinaryDecodable {
+    public init(fromBinary binaryDecoder: BinaryDecoder) throws {
+        var v = Self.init()
+        try binaryDecoder.read(into: &v)
+        self = v
+    }
+}
+
+extension SIMD where Self: BinaryEncodable {
+    public func binaryEncode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        for index in self.indices {
+            let item = self[index]
+            try container.encode(item)
+        }
+        //encoder.appendBytes(of: self)
+    }
+}
+
+extension SIMD2: BinaryCodable where Self.MaskStorage.Scalar: FixedWidthInteger { }
+extension SIMD4: BinaryCodable where Self.MaskStorage.Scalar: FixedWidthInteger { }
+extension SIMD8: BinaryCodable where Self.MaskStorage.Scalar: FixedWidthInteger { }
+
+/*
 extension FixedWidthInteger where Self: BinaryEncodable {
     public func binaryEncode(to encoder: BinaryEncoder) {
         encoder.appendBytes(of: self.littleEndian)
     }
 }
+ */
 
 extension FixedWidthInteger where Self: BinaryDecodable {
     public init(fromBinary binaryDecoder: BinaryDecoder) throws {
