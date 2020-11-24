@@ -10,7 +10,8 @@ extension Array: BinaryEncodable where Element: BinaryEncodable {
             guard let count32 = UInt32(exactly: self.count) else {
                 throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
             }
-            try container.encode(count32)
+            var prefixcontainer = encoder.singleValueContainer()
+            try prefixcontainer.encode(count32)
         }
         for element in self {
             try container.encode(element)
@@ -18,11 +19,11 @@ extension Array: BinaryEncodable where Element: BinaryEncodable {
     }
     
     public func binaryEncode(to encoder: Encoder) throws {
-        var container = encoder.unkeyedContainer()
         guard let count32 = UInt32(exactly: self.count) else {
             throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
         }
-        try container.encode(count32)
+        var prefixcontainer = encoder.singleValueContainer()
+        try prefixcontainer.encode(count32)
         for element in self {
             try (element).encode(to: encoder)
         }
