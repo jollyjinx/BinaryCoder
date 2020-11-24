@@ -19,35 +19,9 @@ public extension BinaryEncodable {
 /// The actual binary encoder class.
 public class BinaryEncoder {
     
-    public init() {}
-}
-
-class BinarySerialiazation {
-    class func dataArray(with object: NSArray) throws -> [UInt8] {
-        return try extactData(object: object)
-    }
+    open var includeStingLenghtPrefix: Bool = true
     
-    private class func extactData(object: NSArray) throws -> [UInt8] {
-        var bytes: [UInt8] = []
-        for (_, child) in object.enumerated() {
-            switch child {
-            case let newBytes as [UInt8]:
-                bytes.append(contentsOf: newBytes)
-            case is NSArray:
-                let newChild = try extactData(object: child as! NSArray)
-                bytes.append(contentsOf: newChild)
-            default:
-                throw BinaryEncoder.Error.unknowObjectType
-            }
-        }
-        
-        return bytes
-    }
-}
-
-/// The error type.
-public extension BinaryEncoder {
-    /// All errors which `BinaryEncoder` itself can throw.
+    /// All errors which can happen during encoding.
     enum Error: Swift.Error {
         /// Attempted to encode a type which is `Encodable`, but not `BinaryEncodable`. (We
         /// require `BinaryEncodable` because `BinaryEncoder` doesn't support full keyed
@@ -65,8 +39,20 @@ public extension BinaryEncoder {
         case unknowObjectType
     }
     
-    func encode(_ encodable: Encodable) throws -> [UInt8] {
-        let encoder = _BinaryEncoder()
+    /// Options set on the top-level encoder to pass down the encoding hierarchy.
+    fileprivate struct _Options {
+        let includeStingLenghtPrefix: Bool
+    }
+    
+    /// The options set on the top-level encoder.
+    fileprivate var options: _Options {
+        return _Options(includeStingLenghtPrefix: includeStingLenghtPrefix)
+    }
+    
+    public init() {}
+    
+    public func encode(_ encodable: Encodable) throws -> [UInt8] {
+        let encoder = _BinaryEncoder(options: self.options)
         let encoded = try encoder.box_(encodable)
         let element = try BinarySerialiazation.dataArray(with: encoded!)
         return element
@@ -78,11 +64,15 @@ private class _BinaryEncoder: Encoder {
     
     var storage: NSMutableArray
     
+    /// Options set on the top-level encoder.
+    let options: BinaryEncoder._Options
+    
     public var codingPath: [CodingKey]
     
     public var userInfo: [CodingUserInfoKey : Any] { return [:] }
     
-    init(codingPath: [CodingKey] = []) {
+    init(options: BinaryEncoder._Options, codingPath: [CodingKey] = []) {
+        self.options = options
         self.codingPath = codingPath
         self.storage = []
     }
@@ -137,6 +127,16 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
+    }
+    
+    public mutating func encode(_ value: String, forKey key: Key) throws {
+        if encoder.options.includeStingLenghtPrefix {
+            guard let count32 = UInt32(exactly: value.count) else {
+                throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(value.count))
+            }
+            self.container.add(self.encoder.box(count32))
+        }
+        self.container.add(try self.encoder.box(value))
     }
     
     func encodeNil(forKey key: Key) throws {}
@@ -214,6 +214,13 @@ private struct _BinaryUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     
     func encodeNil() throws {}
     
+    public mutating func encode(_ value: String) throws {
+        if encoder.options.includeStingLenghtPrefix {
+            self.container.add(self.encoder.box(value.count))
+        }
+        self.container.add(try self.encoder.box(value))
+    }
+    
     public mutating func encode(_ value: Bool)      throws  { self.container.add(self.encoder.box(value)) }
     
     public mutating func encode(_ value: Float)     throws  { self.container.add(self.encoder.box(value)) }
@@ -258,9 +265,12 @@ private struct _BinaryUnkeyedEncodingContainer: UnkeyedEncodingContainer {
 extension _BinaryEncoder: SingleValueEncodingContainer {
     func encodeNil() throws {}
     
-//    func encode(_ value: String) throws {
-//
-//    }
+    public func encode(_ value: String) throws {
+        if self.options.includeStingLenghtPrefix {
+            self.storage.add(self.box(value.count))
+        }
+        self.storage.add(try self.box(value))
+    }
     
     public func encode(_ value: Bool)      throws  { self.storage.add(self.box(value)) }
     
@@ -360,5 +370,28 @@ extension _BinaryEncoder {
             return $0
         }
         return [UInt8].init(buffer)
+    }
+}
+
+class BinarySerialiazation {
+    class func dataArray(with object: NSArray) throws -> [UInt8] {
+        return try extactData(object: object)
+    }
+    
+    private class func extactData(object: NSArray) throws -> [UInt8] {
+        var bytes: [UInt8] = []
+        for (_, child) in object.enumerated() {
+            switch child {
+            case let newBytes as [UInt8]:
+                bytes.append(contentsOf: newBytes)
+            case is NSArray:
+                let newChild = try extactData(object: child as! NSArray)
+                bytes.append(contentsOf: newChild)
+            default:
+                throw BinaryEncoder.Error.unknowObjectType
+            }
+        }
+        
+        return bytes
     }
 }

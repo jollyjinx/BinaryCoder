@@ -4,19 +4,6 @@ import Foundation
 
 
 extension Array: BinaryEncodable where Element: BinaryEncodable {
-    public func binaryEncode(to encoder: Encoder, prefixLenght: Bool = true) throws {
-        var container = encoder.unkeyedContainer()
-        if prefixLenght {
-            guard let count32 = UInt32(exactly: self.count) else {
-                throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
-            }
-            var prefixcontainer = encoder.singleValueContainer()
-            try prefixcontainer.encode(count32)
-        }
-        for element in self {
-            try container.encode(element)
-        }
-    }
     
     public func binaryEncode(to encoder: Encoder) throws {
         guard let count32 = UInt32(exactly: self.count) else {
@@ -57,12 +44,13 @@ extension Array: BinaryDecodable where Element: BinaryDecodable {
 }
 
 extension String: BinaryCodable {
-    public func binaryEncode(to encoder: Encoder, prefixLenght: Bool = true) throws {
-        try Array(self.utf8).binaryEncode(to: encoder, prefixLenght: prefixLenght)
-    }
     
     public func binaryEncode(to encoder: Encoder) throws {
-        try Array(self.utf8).binaryEncode(to: encoder)
+        let elementsArray = self.utf8
+        var container = encoder.unkeyedContainer()
+        for element in elementsArray {
+            try container.encode(element)
+        }
     }
     
     public init(fromBinary decoder: BinaryDecoder, lenght: UInt32? = nil) throws {

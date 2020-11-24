@@ -26,16 +26,6 @@ public class BinaryDecoder {
     }
 }
 
-/*
-/// A convenience function for creating a decoder from some data and decoding it
-/// into a value all in one shot.
-public extension BinaryDecoder {
-    static func decode<T: BinaryDecodable>(_ type: T.Type, data: [UInt8]) throws -> T {
-        return try BinaryDecoder(data: data).decode(T.self)
-    }
-}
- */
-
 /// The error type.
 public extension BinaryDecoder {
     /// All errors which `BinaryDecoder` itself can throw.
