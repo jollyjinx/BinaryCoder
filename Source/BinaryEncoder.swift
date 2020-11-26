@@ -51,30 +51,40 @@ public class BinaryEncoder {
     
     public init() {}
     
-    public func encode(_ encodable: Encodable) throws -> [UInt8] {
+    open func encode<T : Encodable>(_ encodable: T) throws -> [UInt8] {
         let encoder = _BinaryEncoder(options: self.options)
-        let encoded = try encoder.box_(encodable)
-        let element = try BinarySerialiazation.dataArray(with: encoded!)
-        return element
+        guard let encoded = try encoder.box_(encodable) as? BinaryContainer else {
+            throw EncodingError.invalidValue(encodable,
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
+        }
+        
+        do {
+            let element = try BinarySerialiazation.dataArray(with: encoded)
+            return element
+        } catch {
+            throw EncodingError.invalidValue(encodable,
+                                             EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value to JSON.", underlyingError: error))
+        }
     }
 }
 
 /// Methods for encoding various types.
 private class _BinaryEncoder: Encoder {
     
-    var storage: NSMutableArray
+    var storage: _BinaryEncodingStorage
     
     /// Options set on the top-level encoder.
     let options: BinaryEncoder._Options
     
     public var codingPath: [CodingKey]
     
+    // TODO: Add from options
     public var userInfo: [CodingUserInfoKey : Any] { return [:] }
     
     init(options: BinaryEncoder._Options, codingPath: [CodingKey] = []) {
         self.options = options
         self.codingPath = codingPath
-        self.storage = []
+        self.storage = _BinaryEncodingStorage()
     }
     
     /// Returns whether a new element can be encoded at this coding path.
@@ -91,18 +101,38 @@ private class _BinaryEncoder: Encoder {
     }
     
     public func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-        //let newArray = NSMutableArray()
-        //self.storage.add(newArray)
-        
-        let container = _BinaryKeyedEncodingContainer<Key>(referencing: self, codingPath: self.codingPath, wrapping: self.storage)
+        // If an existing keyed container was already requested, return that one.
+        let topContainer: BinaryContainer
+        if self.canEncodeNewValue {
+            // We haven't yet pushed a container at this level; do so here.
+            topContainer = self.storage.pushKeyedContainer()
+        } else {
+            guard let container = self.storage.containers.last as? BinaryContainer, container.type == .fixed else {
+                preconditionFailure("Attempt to push new keyed encoding container when already previously encoded at this path.")
+            }
+
+            topContainer = container
+        }
+
+        let container = _BinaryKeyedEncodingContainer<Key>(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
         return KeyedEncodingContainer(container)
     }
     
     public func unkeyedContainer() -> UnkeyedEncodingContainer {
-        let newArray = NSMutableArray()
-        self.storage.add(newArray)
-        
-        return _BinaryUnkeyedEncodingContainer(referencing: self, codingPath: self.codingPath, wrapping: newArray)
+        // If an existing unkeyed container was already requested, return that one.
+        let topContainer: BinaryContainer
+        if self.canEncodeNewValue {
+            // We haven't yet pushed a container at this level; do so here.
+            topContainer = self.storage.pushUnkeyedContainer()
+        } else {
+            guard let container = self.storage.containers.last as? BinaryContainer, container.type == .variable() else {
+                preconditionFailure("Attempt to push new unkeyed encoding container when already previously encoded at this path.")
+            }
+
+            topContainer = container
+        }
+
+        return _BinaryUnkeyedEncodingContainer(referencing: self, codingPath: self.codingPath, wrapping: topContainer)
     }
     
     public func singleValueContainer() -> SingleValueEncodingContainer {
@@ -111,11 +141,57 @@ private class _BinaryEncoder: Encoder {
     
 }
 
+// MARK: - Encoding Storage and Containers
+
+fileprivate struct _BinaryEncodingStorage {
+    // MARK: Properties
+
+    /// The container stack.
+    /// Elements can be only BinaryContainer.
+    private(set) fileprivate var containers: [AnyByteContainer] = []
+
+    // MARK: - Initialization
+
+    /// Initializes `self` with no containers.
+    fileprivate init() {}
+
+    // MARK: - Modifying the Stack
+
+    fileprivate var count: Int {
+        return self.containers.count
+    }
+
+    fileprivate mutating func pushKeyedContainer() -> BinaryContainer {
+        let dictionary = BinaryContainer(type: .fixed)
+        self.containers.append(dictionary)
+        return dictionary
+    }
+
+    fileprivate mutating func pushUnkeyedContainer() -> BinaryContainer {
+        let array = BinaryContainer(type: .variable())
+        self.containers.append(array)
+        return array
+    }
+
+    fileprivate mutating func push(container: __owned AnyByteContainer) {
+        self.containers.append(container)
+    }
+
+    fileprivate mutating func popContainer() -> AnyByteContainer {
+        precondition(!self.containers.isEmpty, "Empty container stack.")
+        return self.containers.popLast()!
+    }
+}
+
 private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
     
+    // MARK: Properties
+    
+    /// A reference to the encoder we're writing to.
     var encoder: _BinaryEncoder
     
-    var container: NSMutableArray
+    /// A reference to the container we're writing to.
+    var container: BinaryContainer
     
     /// The path of coding keys taken to get to this point in encoding.
     private(set) public var codingPath: [CodingKey]
@@ -123,12 +199,13 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     // MARK: - Initialization
     
     /// Initializes `self` with the given references.
-    init(referencing encoder: _BinaryEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
+    init(referencing encoder: _BinaryEncoder, codingPath: [CodingKey], wrapping container: BinaryContainer) {
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
     }
     
+    /*
     public mutating func encode(_ value: String, forKey key: Key) throws {
         if encoder.options.includeStingLenghtPrefix {
             guard let count32 = UInt32(exactly: value.count) else {
@@ -138,6 +215,7 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
         }
         self.container.add(try self.encoder.box(value))
     }
+     */
     
     func encodeNil(forKey key: Key) throws {}
     
@@ -159,23 +237,32 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     public mutating func encode(_ value: UInt64, forKey key: Key)    throws  { self.container.add(self.encoder.box(value)) }
     
     public mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
+        self.encoder.codingPath.append(key)
+        defer { self.encoder.codingPath.removeLast() }
+        
         let encoded = try self.encoder.box(value)
-        self.container.addObjects(from: encoded)
+        self.container.add(encoded)
     }
     
-    func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        let newArray = NSMutableArray()
-        self.container.add(newArray)
+    public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+        let dictionary: BinaryContainer = BinaryContainer(type: .fixed)
+        self.container.add(dictionary)
         
-        let container = _BinaryKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: newArray)
+        self.codingPath.append(key)
+        defer { self.codingPath.removeLast() }
+
+        let container = _BinaryKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary)
         return KeyedEncodingContainer(container)
     }
     
-    func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let newArray = NSMutableArray()
-        self.container.add(newArray)
+    public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+        let array: BinaryContainer = BinaryContainer(type: .variable())
         
-        return _BinaryUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: newArray)
+        self.container.add(array)
+
+        self.codingPath.append(key)
+        defer { self.codingPath.removeLast() }
+        return _BinaryUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: array)
     }
     
     func superEncoder() -> Encoder {
@@ -188,12 +275,13 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
 }
 
 private struct _BinaryUnkeyedEncodingContainer: UnkeyedEncodingContainer {
+    // MARK: Properties
     
     /// A reference to the encoder we're writing to.
     private let encoder: _BinaryEncoder
     
     /// A reference to the container we're writing to.
-    private let container: NSMutableArray
+    private let container: BinaryContainer
     
     /// The path of coding keys taken to get to this point in encoding.
     private(set) public var codingPath: [CodingKey]
@@ -206,55 +294,121 @@ private struct _BinaryUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     // MARK: - Initialization
 
     /// Initializes `self` with the given references.
-    init(referencing encoder: _BinaryEncoder, codingPath: [CodingKey], wrapping container: NSMutableArray) {
+    init(referencing encoder: _BinaryEncoder, codingPath: [CodingKey], wrapping container: BinaryContainer) {
         self.encoder = encoder
         self.codingPath = codingPath
         self.container = container
     }
     
+    // MARK: - UnkeyedEncodingContainer Methods
+    
     func encodeNil() throws {}
     
+    /*
     public mutating func encode(_ value: String) throws {
         if encoder.options.includeStingLenghtPrefix {
             self.container.add(self.encoder.box(value.count))
         }
         self.container.add(try self.encoder.box(value))
     }
+     */
     
-    public mutating func encode(_ value: Bool)      throws  { self.container.add(self.encoder.box(value)) }
-    
-    public mutating func encode(_ value: Float)     throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Double)    throws  { self.container.add(self.encoder.box(value)) }
-    
-    public mutating func encode(_ value: Int)       throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt)      throws  { self.container.add(self.encoder.box(value)) }
-    
-    public mutating func encode(_ value: Int8)      throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int16)     throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int32)     throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: Int64)     throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt8)     throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt16)    throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt32)    throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt64)    throws  { self.container.add(self.encoder.box(value)) }
-    
-    public mutating func encode<T>(_ value: T) throws where T : Encodable {
-        self.container.addObjects(from: try self.encoder.box(value))
+    public mutating func encode(_ value: Bool) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
     }
     
-    func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-        let newArray = NSMutableArray()
-        self.container.add(newArray)
+    public mutating func encode(_ value: Float) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: Double) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: Int) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: UInt) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: Int8) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: Int16) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: Int32) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: Int64) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: UInt8) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: UInt16) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: UInt32) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode(_ value: UInt64) throws {
+        self.container.add(self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    public mutating func encode<T>(_ value: T) throws where T : Encodable {
+        self.encoder.codingPath.append(_BinaryKey(index: self.count))
+        defer { self.encoder.codingPath.removeLast() }
+        self.container.add(try self.encoder.box(value))
+        self.container.incrementSize(1)
+    }
+    
+    /*
+    mutating func encode<T>(contentsOf sequence: T) throws where T : Sequence {
         
-        let container = _BinaryKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: newArray)
+    }
+     */
+    
+    public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+        self.codingPath.append(_BinaryKey(index: self.count))
+        defer { self.codingPath.removeLast() }
+
+        let dictionary = BinaryContainer(type: .fixed)
+        self.container.add(dictionary)
+
+        let container = _BinaryKeyedEncodingContainer<NestedKey>(referencing: self.encoder, codingPath: self.codingPath, wrapping: dictionary)
         return KeyedEncodingContainer(container)
     }
     
-    func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
-        let newArray = NSMutableArray()
-        self.container.add(newArray)
-        
-        return _BinaryUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: newArray)
+    public mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
+        self.codingPath.append(_BinaryKey(index: self.count))
+        defer { self.codingPath.removeLast() }
+
+        let array = BinaryContainer(type: .variable())
+        self.container.add(array)
+        return _BinaryUnkeyedEncodingContainer(referencing: self.encoder, codingPath: self.codingPath, wrapping: array)
     }
     
     func superEncoder() -> Encoder {
@@ -263,34 +417,86 @@ private struct _BinaryUnkeyedEncodingContainer: UnkeyedEncodingContainer {
 }
 
 extension _BinaryEncoder: SingleValueEncodingContainer {
+    // MARK: - SingleValueEncodingContainer Methods
+
+    private func assertCanEncodeNewValue() {
+        precondition(self.canEncodeNewValue, "Attempt to encode value through single value container when previously value already encoded.")
+    }
+    
     func encodeNil() throws {}
     
+    /*
     public func encode(_ value: String) throws {
         if self.options.includeStingLenghtPrefix {
             self.storage.add(self.box(value.count))
         }
         self.storage.add(try self.box(value))
     }
+     */
     
-    public func encode(_ value: Bool)      throws  { self.storage.add(self.box(value)) }
+    public func encode(_ value: Bool) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
     
-    public func encode(_ value: Float)     throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: Double)    throws  { self.storage.add(self.box(value)) }
+    public func encode(_ value: Float) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
     
-    public func encode(_ value: Int)       throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: UInt)      throws  { self.storage.add(self.box(value)) }
+    public func encode(_ value: Double) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
     
-    public func encode(_ value: Int8)      throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: Int16)     throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: Int32)     throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: Int64)     throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: UInt8)     throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: UInt16)    throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: UInt32)    throws  { self.storage.add(self.box(value)) }
-    public func encode(_ value: UInt64)    throws  { self.storage.add(self.box(value)) }
+    public func encode(_ value: Int) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: UInt) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: Int8) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: Int16) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: Int32) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: Int64) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: UInt8) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: UInt32) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
+    
+    public func encode(_ value: UInt64) throws {
+        assertCanEncodeNewValue()
+        self.storage.push(container: self.box(value))
+    }
     
     func encode<T>(_ value: T) throws where T : Encodable {
-        try self.storage.add(self.box(value))
+        assertCanEncodeNewValue()
+        try self.storage.push(container: self.box(value))
     }
     
     
@@ -300,30 +506,29 @@ extension _BinaryEncoder: SingleValueEncodingContainer {
 
 extension _BinaryEncoder {
     
-    func box(_ value: Bool)     -> [UInt8] { return getBytes(of: value ? 1 as UInt8 : 0 as UInt8) }
+    func box(_ value: Bool)     -> AnyByteContainer { return getBytes(of: value ? 1 as UInt8 : 0 as UInt8) }
     
-    func box(_ value: Float)    -> [UInt8] { return getBytes(of: value) }
-    func box(_ value: Double)   -> [UInt8] { return getBytes(of: value) }
+    func box(_ value: Float)    -> AnyByteContainer { return getBytes(of: value) }
+    func box(_ value: Double)   -> AnyByteContainer { return getBytes(of: value) }
     
-    func box(_ value: Int)      -> [UInt8] { return box(Int64(value)) }
-    func box(_ value: UInt)     -> [UInt8] { return box(UInt64(value)) }
+    func box(_ value: Int)      -> AnyByteContainer { return box(Int64(value)) }
+    func box(_ value: UInt)     -> AnyByteContainer { return box(UInt64(value)) }
     
-    func box(_ value: Int8)     -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: Int16)    -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: Int32)    -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: Int64)    -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: UInt8)    -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: UInt16)   -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: UInt32)   -> [UInt8] { return getBytes(of: value.littleEndian) }
-    func box(_ value: UInt64)   -> [UInt8] { return getBytes(of: value.littleEndian) }
+    func box(_ value: Int8)     -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: Int16)    -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: Int32)    -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: Int64)    -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: UInt8)    -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: UInt16)   -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: UInt32)   -> AnyByteContainer { return getBytes(of: value.littleEndian) }
+    func box(_ value: UInt64)   -> AnyByteContainer { return getBytes(of: value.littleEndian) }
     
-    func box(_ value: Encodable) throws -> [UInt8] {
-        let result = try self.box_(value)
-        let ret = (result as? [UInt8]) ?? (NSMutableArray() as! [UInt8])
-        return ret
+    func box(_ value: Encodable) throws -> AnyByteContainer {
+        let result = try self.box_(value) ?? []
+        return result
     }
     
-    func box_(_ value: Encodable) throws -> NSMutableArray? {
+    func box_(_ value: Encodable) throws -> AnyByteContainer? {
         
         if let binary = value as? BinaryEncodable {
             
@@ -334,7 +539,7 @@ extension _BinaryEncoder {
             } catch {
                 // If the value pushed a container before throwing, pop it back off to restore state.
                 if self.storage.count > depth {
-                    let _ = self.storage.removeLastObject()
+                    let _ = self.storage.popContainer()
                 }
 
                 throw error
@@ -345,7 +550,7 @@ extension _BinaryEncoder {
                 return nil
             }
             
-            return self.storage
+            return self.storage.popContainer()
         } else {
             throw BinaryEncoder.Error.typeNotConformingToBinaryEncodable(type(of: value))
         }
@@ -370,28 +575,5 @@ extension _BinaryEncoder {
             return $0
         }
         return [UInt8].init(buffer)
-    }
-}
-
-class BinarySerialiazation {
-    class func dataArray(with object: NSArray) throws -> [UInt8] {
-        return try extactData(object: object)
-    }
-    
-    private class func extactData(object: NSArray) throws -> [UInt8] {
-        var bytes: [UInt8] = []
-        for (_, child) in object.enumerated() {
-            switch child {
-            case let newBytes as [UInt8]:
-                bytes.append(contentsOf: newBytes)
-            case is NSArray:
-                let newChild = try extactData(object: child as! NSArray)
-                bytes.append(contentsOf: newChild)
-            default:
-                throw BinaryEncoder.Error.unknowObjectType
-            }
-        }
-        
-        return bytes
     }
 }

@@ -6,13 +6,9 @@ import Foundation
 extension Array: BinaryEncodable where Element: BinaryEncodable {
     
     public func binaryEncode(to encoder: Encoder) throws {
-        guard let count32 = UInt32(exactly: self.count) else {
-            throw BinaryEncoder.Error.lenghtOutOfRange(UInt64(self.count))
-        }
-        var prefixcontainer = encoder.singleValueContainer()
-        try prefixcontainer.encode(count32)
+        var container = encoder.unkeyedContainer()
         for element in self {
-            try (element).encode(to: encoder)
+            try container.encode(element)
         }
     }
 }
@@ -48,6 +44,7 @@ extension String: BinaryCodable {
     public func binaryEncode(to encoder: Encoder) throws {
         let elementsArray = self.utf8
         var container = encoder.unkeyedContainer()
+        //try container.encode(contentsOf: elementsArray)
         for element in elementsArray {
             try container.encode(element)
         }
@@ -81,12 +78,30 @@ extension SIMD where Self: BinaryDecodable {
     }
 }
 
+/// A wrapper for dictionary keys which are Strings or Ints.
+internal struct _FixedCodingKey: CodingKey {
+  internal let stringValue: String
+  internal let intValue: Int?
+
+  internal init?(stringValue: String) {
+    self.stringValue = stringValue
+    self.intValue = Int(stringValue)
+  }
+
+  internal init?(intValue: Int) {
+    self.stringValue = "\(intValue)"
+    self.intValue = intValue
+  }
+}
+
 extension SIMD where Self: BinaryEncodable {
+    
     public func binaryEncode(to encoder: Encoder) throws {
-        var container = encoder.unkeyedContainer()
+        var container = encoder.container(keyedBy: _FixedCodingKey.self)
         for index in self.indices {
             let item = self[index]
-            try container.encode(item)
+            let key = _FixedCodingKey(intValue: index)!
+            try container.encode(item, forKey: key)
         }
         //encoder.appendBytes(of: self)
     }
