@@ -216,10 +216,6 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
         self.container = container
     }
     
-    public mutating func encodeFixed(_ value: [UInt8], forKey: Key) throws {
-        self.container.add(try self.encoder.boxFixed(value))
-    }
-    
     func encodeNil(forKey key: Key) throws {}
     
     public mutating func encode(_ value: Bool, forKey key: Key)      throws  { self.container.add(self.encoder.box(value)) }
@@ -234,9 +230,7 @@ private struct _BinaryKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingConta
     public mutating func encode(_ value: Int16, forKey key: Key)     throws  { self.container.add(self.encoder.box(value)) }
     public mutating func encode(_ value: Int32, forKey key: Key)     throws  { self.container.add(self.encoder.box(value)) }
     public mutating func encode(_ value: Int64, forKey key: Key)     throws  { self.container.add(self.encoder.box(value)) }
-    public mutating func encode(_ value: UInt8, forKey key: Key)     throws  {
-        self.container.add(self.encoder.box(value))
-    }
+    public mutating func encode(_ value: UInt8, forKey key: Key)     throws  { self.container.add(self.encoder.box(value)) }
     public mutating func encode(_ value: UInt16, forKey key: Key)    throws  { self.container.add(self.encoder.box(value)) }
     public mutating func encode(_ value: UInt32, forKey key: Key)    throws  { self.container.add(self.encoder.box(value)) }
     public mutating func encode(_ value: UInt64, forKey key: Key)    throws  { self.container.add(self.encoder.box(value)) }
@@ -308,10 +302,6 @@ private struct _BinaryUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     // MARK: - UnkeyedEncodingContainer Methods
     
     func encodeNil() throws {}
-    
-    public mutating func encodeFixed(_ value: [UInt8]) throws {
-        self.container.add(try self.encoder.boxFixed(value))
-    }
     
     public mutating func encode(_ value: String) throws {
         self.container.add(try self.encoder.box(value))
@@ -429,15 +419,6 @@ extension _BinaryEncoder: SingleValueEncodingContainer {
     
     func encodeNil() throws {}
     
-    /*
-    public func encode(_ value: String) throws {
-        if self.options.includeStingLenghtPrefix {
-            self.storage.add(self.box(value.count))
-        }
-        self.storage.add(try self.box(value))
-    }
-     */
-    
     public func encode(_ value: Bool) throws {
         assertCanEncodeNewValue()
         self.storage.push(container: self.box(value))
@@ -527,18 +508,14 @@ extension _BinaryEncoder {
     func box(_ value: UInt32)   -> AnyByteContainer { return getBytes(of: value.littleEndian) }
     func box(_ value: UInt64)   -> AnyByteContainer { return getBytes(of: value.littleEndian) }
     
-    func boxFixed<T : Encodable & Collection>(_ value: T) throws -> AnyByteContainer where T.Element: BinaryEncodable {
-        if let binary = value as? BinaryEncodable {
-            let result = try self.box_(binary) ?? []
-            return result
-        } else {
-            throw BinaryEncoder.Error.typeNotConformingToBinaryEncodable(type(of: value))
-        }
-    }
-    
     func box<T : Encodable>(_ value: T) throws -> AnyByteContainer {
         if let binary = value as? BinaryEncodable {
-            let result = try self.box_(binary) ?? []
+            let result: AnyByteContainer
+            if let fixedSize = value as? FixedSizeData {
+                result = try self.boxFixed_(fixedSize.data) ?? []
+            } else {
+                result = try self.box_(binary) ?? []
+            }
             return result
         } else {
             throw BinaryEncoder.Error.typeNotConformingToBinaryEncodable(type(of: value))
@@ -601,24 +578,3 @@ extension _BinaryEncoder {
         return [UInt8].init(buffer)
     }
 }
-
-extension KeyedEncodingContainerProtocol {
-    public mutating func encodeFixed(_ value: [UInt8], forKey: Key) throws {
-        fatalError("Unimplemented")
-        //try self.encode(value, forKey: forKey)
-    }
-}
-
-extension UnkeyedEncodingContainer {
-    public mutating func encodeFixed(_ value: [UInt8]) throws {
-        fatalError("Unimplemented")
-        //try encode(value)
-    }
-}
-/*
-extension KeyedEncodingContainer {
-    public mutating func encodeFixed(_ value: [UInt8], forKey: Key) throws {
-        try _box.encode(value, forKey: key)
-    }
-}
- */

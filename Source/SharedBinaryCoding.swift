@@ -105,3 +105,16 @@ internal struct _FixedCodingKey: CodingKey {
     self.intValue = intValue
   }
 }
+
+public struct FixedSizeData: BinaryEncodable & BinaryDecodable {
+    var data: [UInt8]
+    
+    public init(_ data: [UInt8]) {
+        self.data = data
+    }
+    
+    public init(_ string: String) {
+        let utf8string = string.utf8.map { $0 }
+        self.data = utf8string
+    }
+}

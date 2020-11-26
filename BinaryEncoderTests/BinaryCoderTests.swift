@@ -102,8 +102,8 @@ class BinaryCoderTests: XCTestCase {
             func binaryEncode(to encoder: Encoder) throws {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 
-                let utf8string = self.fixedHeader.utf8.map { $0 }
-                try container.encodeFixed(utf8string, forKey: CodingKeys.fixedHead)
+                let data = FixedSizeData(self.fixedHeader)
+                try container.encode(data, forKey: CodingKeys.fixedHead)
                 
                 try container.encode(self.name, forKey: CodingKeys.name)
                 try container.encode(self.rawBytes, forKey: CodingKeys.rawBytes)
