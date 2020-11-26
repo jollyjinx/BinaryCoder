@@ -44,7 +44,6 @@ extension String: BinaryCodable {
     public func binaryEncode(to encoder: Encoder) throws {
         let elementsArray = self.utf8
         var container = encoder.unkeyedContainer()
-        //try container.encode(contentsOf: elementsArray)
         for element in elementsArray {
             try container.encode(element)
         }
@@ -78,22 +77,6 @@ extension SIMD where Self: BinaryDecodable {
     }
 }
 
-/// A wrapper for dictionary keys which are Strings or Ints.
-internal struct _FixedCodingKey: CodingKey {
-  internal let stringValue: String
-  internal let intValue: Int?
-
-  internal init?(stringValue: String) {
-    self.stringValue = stringValue
-    self.intValue = Int(stringValue)
-  }
-
-  internal init?(intValue: Int) {
-    self.stringValue = "\(intValue)"
-    self.intValue = intValue
-  }
-}
-
 extension SIMD where Self: BinaryEncodable {
     
     public func binaryEncode(to encoder: Encoder) throws {
@@ -103,7 +86,6 @@ extension SIMD where Self: BinaryEncodable {
             let key = _FixedCodingKey(intValue: index)!
             try container.encode(item, forKey: key)
         }
-        //encoder.appendBytes(of: self)
     }
 }
 

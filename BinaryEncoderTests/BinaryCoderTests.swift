@@ -77,6 +77,73 @@ class BinaryCoderTests: XCTestCase {
         ])
         AssertRoundtrip(company)
     }
+    
+    func testFixedSize() {
+        struct Company: BinaryCodable {
+            var name: String
+            var rawBytes: SIMD4<UInt8>
+            var employees: [Employee]
+            
+            var fixedHeader = "fixed_header"
+            
+            enum CodingKeys: String, CodingKey {
+                case fixedHead
+                case name
+                case rawBytes
+                case employees
+            }
+            
+            init(name: String, rawBytes: SIMD4<UInt8>, employees: [Employee]) {
+                self.name = name
+                self.rawBytes = rawBytes
+                self.employees = employees
+            }
+            
+            func binaryEncode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                
+                let utf8string = self.fixedHeader.utf8.map { $0 }
+                try container.encodeFixed(utf8string, forKey: CodingKeys.fixedHead)
+                
+                try container.encode(self.name, forKey: CodingKeys.name)
+                try container.encode(self.rawBytes, forKey: CodingKeys.rawBytes)
+                try container.encode(self.employees, forKey: CodingKeys.employees)
+            }
+            
+            init(fromBinary decoder: BinaryDecoder) throws {
+                let headerDecoded = try decoder.decode(String.self, lenght: UInt32(self.fixedHeader.count))
+                
+                self.name = try decoder.decode(String.self)
+                self.rawBytes = try decoder.decode(SIMD4<UInt8>.self)
+                self.employees = try decoder.decode([Employee].self)
+                
+                XCTAssertEqual(headerDecoded, self.fixedHeader)
+            }
+            
+            init(from decoder: Decoder) throws {
+                fatalError("Unimplemented")
+            }
+            
+            func encode(to encoder: Encoder) throws {
+                fatalError("Unimplemented")
+            }
+        }
+        
+        struct Employee: BinaryCodable {
+            var name: String
+            var jobTitle: String
+            var age: Int
+        }
+        
+        let company = Company(name: "Joe's Discount Airbags",
+                              rawBytes: SIMD4(arrayLiteral: 2, 0, 240, 1), employees: [
+            Employee(name: "Joe Johnson", jobTitle: "CEO", age: 27),
+            Employee(name: "Stan Lee", jobTitle: "Janitor", age: 87),
+            Employee(name: "Dracula", jobTitle: "Dracula", age: 41),
+            Employee(name: "Steve Jobs", jobTitle: "Visionary", age: 56),
+        ])
+        AssertRoundtrip(company)
+    }
 }
 
 private func AssertEqual<T>(_ lhs: T, _ rhs: T, file: StaticString = #file, line: UInt = #line) {

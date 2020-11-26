@@ -89,3 +89,19 @@ internal struct _BinaryKey : CodingKey {
 
     static let `super` = _BinaryKey(stringValue: "super")!
 }
+
+/// A wrapper for fixed size sequences.
+internal struct _FixedCodingKey: CodingKey {
+  internal let stringValue: String
+  internal let intValue: Int?
+
+  internal init?(stringValue: String) {
+    self.stringValue = stringValue
+    self.intValue = Int(stringValue)
+  }
+
+  internal init?(intValue: Int) {
+    self.stringValue = "\(intValue)"
+    self.intValue = intValue
+  }
+}
