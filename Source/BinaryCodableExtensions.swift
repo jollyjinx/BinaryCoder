@@ -15,8 +15,8 @@ extension Array: BinaryEncodable where Element: BinaryEncodable {
 
 extension Array: BinaryDecodable where Element: BinaryDecodable {
     
-    public init(fromBinary decoder: BinaryDecoder, lenght: UInt32? = nil) throws {
-        var count: UInt32! = lenght
+    public init(fromBinary decoder: BinaryDecoder, length: UInt32? = nil) throws {
+        var count: UInt32! = length
         if count == nil {
             count = try decoder.decode(UInt32.self)
         }
@@ -49,8 +49,8 @@ extension String: BinaryCodable {
         }
     }
     
-    public init(fromBinary decoder: BinaryDecoder, lenght: UInt32? = nil) throws {
-        let utf8: [UInt8] = try Array(fromBinary: decoder, lenght: lenght)
+    public init(fromBinary decoder: BinaryDecoder, length: UInt32? = nil) throws {
+        let utf8: [UInt8] = try Array(fromBinary: decoder, length: length)
         if let str = String(bytes: utf8, encoding: .utf8) {
             self = str
         } else {

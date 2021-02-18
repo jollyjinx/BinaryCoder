@@ -111,7 +111,7 @@ class BinaryCoderTests: XCTestCase {
             }
             
             init(fromBinary decoder: BinaryDecoder) throws {
-                let headerDecoded = try decoder.decode(String.self, lenght: UInt32(self.fixedHeader.count))
+                let headerDecoded = try decoder.decode(String.self, length: UInt32(self.fixedHeader.count))
                 
                 self.name = try decoder.decode(String.self)
                 self.rawBytes = try decoder.decode(SIMD4<UInt8>.self)

@@ -21,8 +21,8 @@ internal class BinarySerialiazation {
             case let container as BinaryContainer:
                 var newChild: [UInt8] = []
                 if case let .variable(registerSize: register, size: size) = container.type, register == true {
-                    let lenght = self.getBytes(of: size)
-                    newChild.append(contentsOf: lenght)
+                    let length = self.getBytes(of: size)
+                    newChild.append(contentsOf: length)
                 }
                 try newChild.append(contentsOf: extactData(object: container))
                 

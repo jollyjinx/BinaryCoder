@@ -30,7 +30,7 @@ public extension BinaryEncodable {
 /// The actual binary encoder class.
 public class BinaryEncoder {
     
-    open var includeStingLenghtPrefix: Bool = true
+    open var includeStingLengthPrefix: Bool = true
     
     /// All errors which can happen during encoding.
     enum Error: Swift.Error {
@@ -43,8 +43,8 @@ public class BinaryEncoder {
         case typeNotConformingToEncodable(Any.Type)
         
         /// Attempted to encode a `UInt32` which can't be represented. Because the
-        /// lenght can't be represented with `UInt32`
-        case lenghtOutOfRange(UInt64)
+        /// length can't be represented with `UInt32`
+        case lengthOutOfRange(UInt64)
         
         case containerTypeNotImplemented
         case unknowObjectType
@@ -52,12 +52,12 @@ public class BinaryEncoder {
     
     /// Options set on the top-level encoder to pass down the encoding hierarchy.
     fileprivate struct _Options {
-        let includeStingLenghtPrefix: Bool
+        let includeStingLengthPrefix: Bool
     }
     
     /// The options set on the top-level encoder.
     fileprivate var options: _Options {
-        return _Options(includeStingLenghtPrefix: includeStingLenghtPrefix)
+        return _Options(includeStingLengthPrefix: includeStingLengthPrefix)
     }
     
     public init() {}

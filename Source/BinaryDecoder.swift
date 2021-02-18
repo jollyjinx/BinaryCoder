@@ -82,12 +82,12 @@ public extension BinaryDecoder {
         return (swapped)
     }
     
-    func decode<T: BinaryDecodable & Sequence>(_ type: T.Type, lenght: UInt32) throws -> T {
+    func decode<T: BinaryDecodable & Sequence>(_ type: T.Type, length: UInt32) throws -> T {
         switch type {
         case is String.Type:
-            return try String.init(fromBinary: self, lenght: lenght) as! T
+            return try String.init(fromBinary: self, length: length) as! T
         case is Array<T>.Type:
-            return try Array<T>.init(fromBinary: self, lenght: lenght) as! T
+            return try Array<T>.init(fromBinary: self, length: length) as! T
         default:
             throw Error.typeNotConformingToBinaryDecodable(type)
         }
