@@ -82,7 +82,7 @@ public extension BinaryDecoder {
         return (swapped)
     }
 
-    func decode(_ type: Data.Type, length: UInt64) throws -> Data
+    func decode(_ type: Data.Type, length: Int) throws -> Data
     {
         var data:Data
 
@@ -146,7 +146,7 @@ public extension BinaryDecoder {
 private extension BinaryDecoder {
     /// Read the given number of bytes into the given pointer, advancing the cursor
     /// appropriately.
-    func read(_ byteCount: UInt64, into: UnsafeMutableRawPointer) throws {
+    func read(_ byteCount: Int, into: UnsafeMutableRawPointer) throws {
         if cursor + byteCount > data.count {
             throw Error.prematureEndOfData
         }
