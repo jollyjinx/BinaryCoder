@@ -86,7 +86,7 @@ public extension BinaryDecoder {
     {
         var data:Data
 
-        self.read(length,into: &data)
+        try self.read(length,into: &data)
         return data
     }
 
