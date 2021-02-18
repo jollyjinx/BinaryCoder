@@ -4,6 +4,17 @@ import BinaryCoder
 
 
 class BinaryCoderTests: XCTestCase {
+    func testDataDecoding() throws {
+
+        let originalData = "This is a test".data(using: .utf8)!
+
+        let binaryDecoder = BinaryDecoder(data: [UInt8](originalData) )
+        let decodedData = try binaryDecoder.decode(Data.self, length: originalData.count)
+
+        XCTAssertEqual( originalData, decodedData )
+    }
+
+
     func testPrimitiveEncoding() throws {
         let s = Primitives(a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: false, i: true)
         let data = try BinaryEncoder().encode(s)

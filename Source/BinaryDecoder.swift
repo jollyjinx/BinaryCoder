@@ -84,9 +84,10 @@ public extension BinaryDecoder {
 
     func decode(_ type: Data.Type, length: Int) throws -> Data
     {
-        var data:Data
+        let array = try [UInt8].init(fromBinary: self, length:UInt32(length))
 
-        try self.read(length,into: &data)
+        let data = Data(array)
+
         return data
     }
 
