@@ -82,8 +82,9 @@ public extension BinaryDecoder {
         return (swapped)
     }
 
-    func decode(_ type: Data.Type, length: UInt64) throws -> Data {
-        var Data:Data
+    func decode(_ type: Data.Type, length: UInt64) throws -> Data
+    {
+        var data:Data
 
         self.read(length,into: &data)
         return data
