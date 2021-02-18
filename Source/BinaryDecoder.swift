@@ -84,7 +84,7 @@ public extension BinaryDecoder {
 
     func decode(_ type: Data.Type, length: Int) throws -> Data
     {
-        var data:Data
+        let data:Data
 
         try self.read(length,into: &data)
         return data
