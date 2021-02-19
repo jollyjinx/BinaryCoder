@@ -24,6 +24,8 @@ public class BinaryDecoder {
     public init(data: [UInt8]) {
         self.data = data
     }
+
+    public var isAtEnd:Bool { return cursor >= data.count } 
 }
 
 /// The error type.

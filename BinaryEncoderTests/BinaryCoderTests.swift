@@ -12,6 +12,7 @@ class BinaryCoderTests: XCTestCase {
         let decodedData = try binaryDecoder.decode(Data.self, length: originalData.count)
 
         XCTAssertEqual( originalData, decodedData )
+        XCTAssertTrue(binaryDecoder.isAtEnd)
     }
 
 
