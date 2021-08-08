@@ -20,7 +20,11 @@ public extension BinaryDecodable {
 public class BinaryDecoder {
     fileprivate let data: [UInt8]
     fileprivate var cursor = 0
-    
+
+    public var position:Int {   get { cursor }
+                                set { if newValue >= 0 { cursor = newValue } }
+                            }
+
     public init(data: [UInt8]) {
         self.data = data
     }
