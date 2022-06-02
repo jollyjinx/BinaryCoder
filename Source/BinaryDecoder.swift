@@ -21,15 +21,21 @@ public class BinaryDecoder {
     fileprivate let data: [UInt8]
     fileprivate var cursor = 0
 
-    public var position:Int {   get { cursor }
-                                set { if newValue >= 0 { cursor = newValue } }
-                            }
-
     public init(data: [UInt8]) {
         self.data = data
     }
+}
 
-    public var isAtEnd:Bool { return cursor >= data.count } 
+// access to positions
+public extension BinaryDecoder
+{
+    var position:Int {   get { cursor }
+                                set { if newValue >= 0 { cursor = newValue } }
+                            }
+    var countToEnd:Int { data.count - cursor }
+    var dataToEnd:ArraySlice<UInt8> { data.suffix(from: cursor) }
+
+    var isAtEnd:Bool { return cursor >= data.count }
 }
 
 /// The error type.
