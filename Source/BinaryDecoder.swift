@@ -147,11 +147,16 @@ public extension BinaryDecoder {
             throw Error.typeNotConformingToBinaryDecodable(type)
         }
     }
-    
     /// Read the appropriate number of raw bytes directly into the given value. No byte
     /// swapping or other postprocessing is done.
-    func read<T>(into: inout T) throws {
-        try read(MemoryLayout<T>.size, into: &into)
+    func read<T: BinaryDecodable>(into: inout T) throws {
+        let size = MemoryLayout<T>.size
+        try withUnsafeMutableBytes(of: &into) { buffer in
+            guard buffer.count == size else {
+                throw Error.prematureEndOfData 
+            }
+            try read(size, into: buffer.baseAddress!)
+        }
     }
 }
 
@@ -259,10 +264,10 @@ extension BinaryDecoder: Decoder {
     }
 }
 
-private extension FixedWidthInteger {
-    static func from(binaryDecoder: BinaryDecoder) throws -> Self {
-        var v = Self.init()
-        try binaryDecoder.read(into: &v)
-        return self.init(littleEndian: v)
-    }
-}
+//private extension FixedWidthInteger {
+//    static func from(binaryDecoder: BinaryDecoder) throws -> Self {
+//        var v = Self.init()
+//        try binaryDecoder.read(into: &v)
+//        return self.init(littleEndian: v)
+//    }
+//}
